@@ -3,14 +3,13 @@
 #include <string.h>
 #include <stdlib.h>
 
-/* Fast-loop CLI test for the pure core. No Db2. */
+/* Fast-loop test for the pure core; no Db2. */
 int main(void)
 {
-    const char *s = "chunking is fun to build"; /* 24 bytes */
+    const char *s = "chunking is fun to build"; /* 24 bytes / 10 => 3 chunks */
     size_t n = 0;
     chunk_desc *d = chunk_fixed(s, strlen(s), 10, &n);
 
-    /* 24 bytes / window 10 => 3 chunks: [0,10) [10,10) [20,4) */
     if (n != 3) {
         fprintf(stderr, "FAIL: expected 3 chunks, got %zu\n", n);
         free(d);
