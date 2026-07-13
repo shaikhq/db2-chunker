@@ -1,4 +1,4 @@
-# db2-chunker
+# db2-chunker (non-production sample implementation)
 
 > A tiny **Db2 user-defined table function**, written in C, that splits text into
 > fixed-size pieces ("chunks") and returns them as table rows.
