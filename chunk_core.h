@@ -3,16 +3,10 @@
 
 #include <stddef.h>
 
-/* Pure fixed-window chunker: no Db2, no I/O. */
-
-typedef struct {
-    size_t offset;
-    size_t length;
-} chunk_desc;
-
-/* Fixed windows over `len` bytes. Returns a malloc'd array (caller frees) and
- * writes the count to *out_count. NULL/count 0 on bad input or len == 0. */
-chunk_desc *chunk_fixed(const char *buf, size_t len, int chunk_size,
-                        size_t *out_count);
+/* Pure fixed-window math: no Db2, no allocation. Computes one window on demand.
+ * For 0-based `index`, writes that window's byte offset and length and returns
+ * 1; returns 0 when `index` is past the end (or chunk_size is 0). */
+int chunk_window(size_t len, size_t chunk_size, size_t index,
+                 size_t *offset, size_t *length);
 
 #endif /* CHUNK_CORE_H */

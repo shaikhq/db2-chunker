@@ -5,13 +5,13 @@
 -- the C entry point receives SQLUDF_TRAIL_ARGS_ALL (scratchpad + call type).
 -- FENCED runs it out of the engine's address space (safe for a spike).
 -- EXTERNAL NAME 'db2chunk!chunk_tf' => sqllib/function/db2chunk, symbol chunk_tf.
-CREATE OR REPLACE FUNCTION chunk(text VARCHAR(4096), chunk_size INTEGER)
-    RETURNS TABLE (chunk_index INTEGER, chunk_text VARCHAR(4096))
+CREATE OR REPLACE FUNCTION chunk(text VARCHAR(32672), chunk_size INTEGER)
+    RETURNS TABLE (chunk_index INTEGER, chunk_text VARCHAR(32672))
     LANGUAGE C
     PARAMETER STYLE SQL
     NO SQL
     FENCED
-    NOT DETERMINISTIC
+    DETERMINISTIC
     NO EXTERNAL ACTION
     SCRATCHPAD 100
     FINAL CALL

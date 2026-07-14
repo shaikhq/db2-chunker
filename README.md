@@ -172,13 +172,13 @@ many times** for a single query — once for each step of a lifecycle.
 
 Think of it like reading a file:
 
-| Step      | Like a file... | Your function does...                         |
-|-----------|----------------|-----------------------------------------------|
-| **FIRST** | program starts | nothing (setup marker)                        |
-| **OPEN**  | open the file  | split the text into all chunks, remember them |
-| **FETCH** | read a line    | return the **next** chunk (called repeatedly) |
-| **CLOSE** | close the file | free memory                                   |
-| **FINAL** | program ends   | nothing (teardown marker)                      |
+| Step      | Like a file... | Your function does...                              |
+|-----------|----------------|----------------------------------------------------|
+| **FIRST** | program starts | nothing (setup marker)                             |
+| **OPEN**  | open the file  | record the text length, chunk size, and a cursor   |
+| **FETCH** | read a line    | compute & return the **next** chunk (repeatedly)   |
+| **CLOSE** | close the file | nothing (no memory to free)                        |
+| **FINAL** | program ends   | nothing (teardown marker)                          |
 
 For our example query (24 characters, size 10 → 3 chunks), Db2 makes **8 calls**:
 
@@ -190,12 +190,12 @@ FIRST → OPEN → FETCH → FETCH → FETCH → FETCH → CLOSE → FINAL
 
 Three things trip up beginners — internalize these:
 
-1. **Do the work once, hand it out slowly.** All chunks are computed at `OPEN`.
-   Each `FETCH` just returns one already-computed chunk.
-2. **Your function forgets everything between calls.** Local variables vanish.
-   To remember "which chunk is next," we use the **scratchpad** — a small memory
-   area Db2 hands back to you on every call. (We store a pointer to our data in
-   it.)
+1. **Your function forgets everything between calls.** Local variables vanish.
+   To remember where it is, we keep three numbers — text length, chunk size, and
+   a cursor — in the **scratchpad**, a small memory area Db2 hands back to you on
+   every call. That's all the state a fixed-window chunker needs (no allocation).
+2. **Each chunk is computed on demand.** For fixed windows, chunk *i* starts at
+   `i * chunk_size` — so `FETCH` just does the arithmetic and advances the cursor.
 3. **There's always one extra FETCH.** Db2 keeps fetching until a `FETCH` says
    "no more rows" (by setting a special status code, `SQLSTATE 02000`). So N rows
    means N+1 fetches.
