@@ -123,12 +123,10 @@ void chunk_tf(SQLUDF_VARCHAR   *in_text,
         sp_put(SQLUDF_SCRAT, NULL);
         break;
 
-    /* FINAL: once per statement; defensive free if a scan ended early. */
+    /* FINAL: once per statement. Freeing happens in CLOSE; nothing to do here.
+     * Trade-off: a scan torn down without CLOSE would leak until process exit. */
     case SQLUDF_TF_FINAL:
         TRACE("FINAL");
-        st = sp_get(SQLUDF_SCRAT);
-        st_free(st);
-        sp_put(SQLUDF_SCRAT, NULL);
         break;
 
     default:
