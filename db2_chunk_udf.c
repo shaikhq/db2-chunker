@@ -19,9 +19,10 @@
 /* FETCH past the last chunk sets SQLSTATE 02000 (no data); no header constant. */
 #define CHUNK_SQLSTATE_ENDDATA "02000"
 
-/* Per-scan state; only a tf_state* lives in the 100-byte scratchpad. */
+/* Per-scan state; only a tf_state* lives in the 100-byte scratchpad. Offsets
+ * index into the per-call in_text (Db2 re-passes inputs on every call), so no
+ * copy of the text is kept. */
 typedef struct {
-    char       *text;
     chunk_desc *descs;
     size_t      count;
     size_t      next;
@@ -42,7 +43,6 @@ static void sp_put(SQLUDF_SCRATCHPAD *sp, tf_state *st)
 static void st_free(tf_state *st)
 {
     if (!st) return;
-    free(st->text);
     free(st->descs);
     free(st);
 }
@@ -82,15 +82,8 @@ void chunk_tf(SQLUDF_VARCHAR   *in_text,
         if (SQLUDF_NULL(in_text_ind) || SQLUDF_NULL(in_size_ind)) {
             st->count = 0;
         } else {
-            size_t len = strlen(in_text);
-            st->text = malloc(len + 1);
-            if (st->text == NULL) {
-                free(st);
-                strcpy(SQLUDF_STATE, "38901");
-                return;
-            }
-            memcpy(st->text, in_text, len + 1);
-            st->descs = chunk_fixed(st->text, len, (int)*in_size, &st->count);
+            st->descs = chunk_fixed(in_text, strlen(in_text), (int)*in_size,
+                                    &st->count);
         }
         st->next = 0;
         sp_put(SQLUDF_SCRAT, st);
@@ -107,7 +100,7 @@ void chunk_tf(SQLUDF_VARCHAR   *in_text,
         {
             chunk_desc d = st->descs[st->next];
             *out_index = (SQLUDF_INTEGER)st->next;
-            memcpy(out_text, st->text + d.offset, d.length);
+            memcpy(out_text, in_text + d.offset, d.length); /* in_text valid each call */
             out_text[d.length] = '\0';
             *out_index_ind = 0;
             *out_text_ind  = 0;

@@ -18,19 +18,30 @@ installed header `/opt/ibm/db2/V12.1/include/sqludf.h`, not memory.
   a pointer is 8 bytes and fits with room to spare. Db2 preserves `data[]`
   byte-for-byte across OPEN/FETCH/CLOSE, so the pointer survives the scan.
 
-## Allocate on OPEN, free on CLOSE (FIRST/FINAL as brackets)
-- **Decision:** build state in OPEN, free in CLOSE; FIRST only traces, FINAL is a
-  defensive free of any leftover state.
-- **Alternatives:** allocate in FIRST / free in FINAL.
+## Allocate on OPEN, free on CLOSE (single free site)
+- **Decision:** build state in OPEN, free in CLOSE; FIRST and FINAL only trace.
+- **Alternatives:** allocate in FIRST / free in FINAL; or free in both CLOSE and
+  FINAL (belt-and-suspenders).
 - **Reason:** OPEN..CLOSE brackets a single scan and can repeat (e.g. a table
   function re-scanned in a join); per-scan alloc/free is the leak-free match.
   FIRST/FINAL fire once per statement — wrong granularity for scan state.
+- **Trade-off:** with no FINAL free, a scan torn down without CLOSE (an abnormal
+  statement abort) leaks its one allocation until the fenced process exits.
+  CLOSE always fires on normal and re-scan paths, so this never triggers in
+  practice.
 
-## Copy the input text on OPEN
-- **Decision:** `malloc`+`memcpy` the input VARCHAR into `tf_state.text`.
-- **Alternatives:** keep the descriptors pointing into Db2's argument buffer.
-- **Reason:** the input buffer's lifetime across FETCH calls isn't guaranteed;
-  owning a private copy makes FETCH's substring emission safe.
+## Read the input directly at FETCH (no text copy)
+- **Decision:** keep only `{offset, length}` descriptors; FETCH emits from the
+  per-call `in_text` (`memcpy(out_text, in_text + offset, length)`). No copy of
+  the input is stored.
+- **Alternatives:** `malloc`+`memcpy` the whole VARCHAR into the scratchpad
+  state on OPEN (the original approach) so FETCH reads from an owned buffer.
+- **Reason:** Db2 re-passes the SQL input arguments on every table-function
+  call, so `in_text` is valid at FETCH — verified empirically on Db2 12.1
+  FENCED: reading `in_text` at FETCH returns byte-identical rows to the copy.
+  Because descriptors hold offsets (not pointers), they stay valid regardless of
+  where `in_text` lives. Dropping the copy removes a per-OPEN allocation and an
+  O(n) memcpy — meaningful for large text re-scanned in a join.
 
 ## End-of-data uses SQLSTATE '02000', defined locally
 - **Decision:** on a FETCH past the last chunk, `strcpy(SQLUDF_STATE, "02000")`.
